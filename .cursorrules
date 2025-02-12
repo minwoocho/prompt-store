@@ -1,0 +1,344 @@
+# PROMPT STORE Cursor AI 규칙
+
+## 1. 프로젝트 구조 규칙
+
+### 디렉토리 구조
+```
+src/
+├── components/         # 재사용 가능한 컴포넌트
+│   ├── common/        # 공통 컴포넌트
+│   ├── layout/        # 레이아웃 관련 컴포넌트
+│   └── features/      # 기능별 컴포넌트
+├── hooks/             # 커스텀 훅
+├── pages/             # 페이지 컴포넌트
+├── stores/            # Zustand 스토어
+├── styles/            # 전역 스타일
+├── types/             # TypeScript 타입 정의
+├── utils/             # 유틸리티 함수
+└── api/               # API 관련 코드
+```
+
+### 파일 명명 규칙
+- 컴포넌트: PascalCase.tsx (예: RuleCard.tsx)
+- 훅: use{Name}.ts (예: useRules.ts)
+- 유틸리티: camelCase.ts (예: formatDate.ts)
+- 타입: PascalCase.types.ts (예: Rule.types.ts)
+- 테스트: {FileName}.test.tsx (예: RuleCard.test.tsx)
+- 스타일: {FileName}.styles.ts (예: RuleCard.styles.ts)
+
+## 2. 코드 생성 규칙
+
+### 컴포넌트 생성
+```typescript
+// 1. 타입 정의
+interface RuleCardProps {
+  rule: Rule;
+  onEdit?: (id: string) => void;
+}
+
+// 2. 컴포넌트 구조
+export const RuleCard: React.FC<RuleCardProps> = ({ rule, onEdit }) => {
+  // 상태 및 훅
+  const [isExpanded, setIsExpanded] = useState(false);
+  const { isLoading } = useRuleStore();
+
+  // 메모이제이션
+  const handleEdit = useCallback(() => {
+    onEdit?.(rule.id);
+  }, [onEdit, rule.id]);
+
+  // 렌더링
+  return (
+    <StyledCard>
+      <h2>{rule.title}</h2>
+      {isExpanded && <p>{rule.content}</p>}
+      <Button onClick={handleEdit}>Edit</Button>
+    </StyledCard>
+  );
+};
+```
+
+### 스토어 생성
+```typescript
+// 1. 타입 정의
+interface RuleStore {
+  rules: Rule[];
+  isLoading: boolean;
+  error: Error | null;
+  fetchRules: () => Promise<void>;
+  addRule: (rule: Rule) => void;
+}
+
+// 2. 스토어 구현
+const useRuleStore = create<RuleStore>((set) => ({
+  rules: [],
+  isLoading: false,
+  error: null,
+  fetchRules: async () => {
+    try {
+      set({ isLoading: true });
+      const rules = await api.getRules();
+      set({ rules, isLoading: false });
+    } catch (error) {
+      set({ error: error as Error, isLoading: false });
+    }
+  },
+  addRule: (rule) => set((state) => ({
+    rules: [...state.rules, rule]
+  })),
+}));
+```
+
+### API 통합
+```typescript
+// 1. API 클라이언트
+const api = {
+  headers: {
+    'Authorization': `Bearer ${getToken()}`,
+    'Content-Type': 'application/json',
+  },
+  
+  async getRules(): Promise<Rule[]> {
+    const response = await fetch('/api/rules', {
+      headers: this.headers,
+    });
+    if (!response.ok) throw new Error('Failed to fetch rules');
+    return response.json();
+  },
+};
+
+// 2. 에러 처리
+const handleApiError = (error: unknown) => {
+  if (error instanceof Error) {
+    console.error('API Error:', error.message);
+  }
+  // 사용자에게 에러 표시
+};
+```
+
+## 3. 타입 시스템 규칙
+
+### 기본 타입 정의
+```typescript
+// 1. 도메인 타입
+interface Rule {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: Date;
+  status: RuleStatus;
+}
+
+type RuleStatus = 'draft' | 'published' | 'archived';
+
+// 2. API 타입
+interface ApiResponse<T> {
+  data: T;
+  status: number;
+  message: string;
+}
+
+// 3. 상태 타입
+interface RuleState {
+  rules: Rule[];
+  isLoading: boolean;
+  error: Error | null;
+}
+```
+
+### 타입 가드
+```typescript
+function isRule(value: unknown): value is Rule {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'title' in value &&
+    'content' in value
+  );
+}
+```
+
+## 4. 성능 최적화 규칙
+
+### 컴포넌트 최적화
+```typescript
+// 1. 메모이제이션
+const MemoizedRuleCard = React.memo(RuleCard);
+
+// 2. 지연 로딩
+const RuleEditor = lazy(() => import('./RuleEditor'));
+
+// 3. 가상화
+import { VirtualList } from 'react-window';
+```
+
+### 번들 최적화
+- 코드 스플리팅 사용
+- 동적 임포트 활용
+- 번들 분석 도구 사용
+
+## 5. 보안 규칙
+
+### 데이터 검증
+```typescript
+// 1. 입력 검증
+const validateRule = (rule: unknown): rule is Rule => {
+  if (!isRule(rule)) return false;
+  if (rule.title.length > 100) return false;
+  if (rule.content.length > 10000) return false;
+  return true;
+};
+
+// 2. API 응답 검증
+const validateApiResponse = <T>(
+  response: unknown,
+  validator: (value: unknown) => value is T
+): response is ApiResponse<T> => {
+  // ...
+};
+```
+
+### 인증/인가
+```typescript
+// 1. 토큰 관리
+const getToken = () => localStorage.getItem('token');
+const setToken = (token: string) => localStorage.setItem('token', token);
+
+// 2. 인증 확인
+const isAuthenticated = () => Boolean(getToken());
+```
+
+## 6. 테스트 규칙
+
+### 단위 테스트
+```typescript
+describe('RuleCard', () => {
+  const mockRule = {
+    id: '1',
+    title: 'Test Rule',
+    content: 'Test Content',
+  };
+
+  it('renders correctly', () => {
+    render(<RuleCard rule={mockRule} />);
+    expect(screen.getByText('Test Rule')).toBeInTheDocument();
+  });
+
+  it('handles edit click', () => {
+    const onEdit = jest.fn();
+    render(<RuleCard rule={mockRule} onEdit={onEdit} />);
+    fireEvent.click(screen.getByText('Edit'));
+    expect(onEdit).toHaveBeenCalledWith('1');
+  });
+});
+```
+
+### 통합 테스트
+```typescript
+describe('RuleStore', () => {
+  it('fetches rules successfully', async () => {
+    const store = useRuleStore.getState();
+    await store.fetchRules();
+    expect(store.rules.length).toBeGreaterThan(0);
+    expect(store.isLoading).toBe(false);
+  });
+});
+```
+
+## 7. 문서화 규칙
+
+### JSDoc 주석
+```typescript
+/**
+ * .cursorrules 파일의 내용을 표시하는 카드 컴포넌트
+ * 
+ * @example
+ * ```tsx
+ * <RuleCard
+ *   rule={ruleData}
+ *   onEdit={handleEdit}
+ * />
+ * ```
+ * 
+ * @param props.rule - 표시할 규칙 데이터
+ * @param props.onEdit - 편집 버튼 클릭 핸들러
+ */
+```
+
+### README 구조
+```markdown
+# 컴포넌트/모듈 이름
+
+## 개요
+간단한 설명
+
+## 사용법
+코드 예시
+
+## Props/매개변수
+상세 설명
+
+## 주의사항
+특이사항 기술
+```
+
+## 8. 개발 워크플로우
+
+### Git 커밋 메시지
+```
+feat: 새로운 기능 추가
+fix: 버그 수정
+docs: 문서 수정
+style: 코드 포맷팅
+refactor: 코드 리팩토링
+test: 테스트 코드
+chore: 빌드 업무 수정
+```
+
+### 브랜치 전략
+- main: 프로덕션 브랜치
+- develop: 개발 브랜치
+- feature/*: 기능 개발
+- bugfix/*: 버그 수정
+- release/*: 릴리스 준비
+
+## 9. 도구 설정
+
+### ESLint
+```json
+{
+  "extends": [
+    "react-app",
+    "react-app/jest",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "rules": {
+    "quotes": ["error", "single"],
+    "semi": ["error", "always"],
+    "@typescript-eslint/explicit-function-return-type": "off",
+    "@typescript-eslint/no-explicit-any": "error"
+  }
+}
+```
+
+### Prettier
+```json
+{
+  "singleQuote": true,
+  "trailingComma": "es5",
+  "printWidth": 100,
+  "tabWidth": 2,
+  "semi": true
+}
+```
+
+### VS Code
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  }
+}
+```
