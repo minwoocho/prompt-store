@@ -443,7 +443,7 @@ const HomePage = () => {
           color="text.secondary"
           sx={{ maxWidth: 600, mx: "auto", mb: 4 }}
         >
-          AI 코딩의 효율성을 높이는 다양한 프롬프트들을 찾아보세요.
+          업무의 효율성을 높이는 다양한 프롬프트들을 찾아보세요.
         </Typography>
 
         <Paper
